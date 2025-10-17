@@ -1,0 +1,105 @@
+import numpy as np
+
+class MLP_FFN:
+    """
+    Implementação de uma Rede Neural Feed Forward (MLP) com uma camada oculta.
+    Utiliza a função Sigmoide como ativação.
+    """
+    def __init__(self, n_input, n_hidden, n_output, learning_rate=0.1, epochs=10000, random_state=1):
+        self.n_input = n_input
+        self.n_hidden = n_hidden
+        self.n_output = n_output
+        self.learning_rate = learning_rate
+        self.epochs = epochs
+        
+        # Inicialização dos pesos
+        rgen = np.random.RandomState(random_state)
+        self.weights_h = rgen.normal(loc=0.0, scale=0.1, size=(n_input, n_hidden))
+        self.bias_h = np.zeros(n_hidden)
+        self.weights_o = rgen.normal(loc=0.0, scale=0.1, size=(n_hidden, n_output))
+        self.bias_o = np.zeros(n_output)
+
+    def _sigmoid(self, z):
+        # np.clip para evitar overflow no exp()
+        z = np.clip(z, -500, 500)
+        return 1.0 / (1.0 + np.exp(-z))
+
+    def _sigmoid_derivative(self, s):
+        # s é a saída da sigmoide
+        return s * (1.0 - s)
+
+    def _forward(self, X):
+        # Passagem da entrada para a camada oculta
+        net_hidden = np.dot(X, self.weights_h) + self.bias_h
+        act_hidden = self._sigmoid(net_hidden)
+        
+        # Passagem da camada oculta para a camada de saída
+        net_output = np.dot(act_hidden, self.weights_o) + self.bias_o
+        act_output = self._sigmoid(net_output)
+        
+        return act_hidden, act_output
+
+    def fit(self, X, y):
+        """
+        Treina a rede usando backpropagation.
+
+        Parâmetros
+        ----------
+        X : {array-like}, shape = [n_samples, n_features]
+        y : {array-like}, shape = [n_samples, n_output_features]
+        """
+        self.cost_ = []
+        for _ in range(self.epochs):
+            
+            # 1. Passagem Direta (Forward Pass)
+            act_hidden, act_output = self._forward(X)
+            
+            # 2. Cálculo do Erro (Função de Custo - Erro Quadrático)
+            cost = np.sum((y - act_output)**2) / 2.0
+            self.cost_.append(cost)
+            
+            # 3. Retropropagação (Backward Pass)
+            
+            # Erro e delta da camada de saída
+            error_output = y - act_output
+            delta_output = error_output * self._sigmoid_derivative(act_output)
+            
+            # Erro e delta da camada oculta (retropropagado)
+            error_hidden = np.dot(delta_output, self.weights_o.T)
+            delta_hidden = error_hidden * self._sigmoid_derivative(act_hidden)
+            
+            # 4. Atualização dos Pesos (Gradiente Descendente)
+            
+            # Gradientes da camada de saída
+            grad_weights_o = np.dot(act_hidden.T, delta_output)
+            grad_bias_o = np.sum(delta_output, axis=0)
+            
+            # Gradientes da camada oculta
+            grad_weights_h = np.dot(X.T, delta_hidden)
+            grad_bias_h = np.sum(delta_hidden, axis=0)
+            
+            # Aplica atualização
+            self.weights_o += self.learning_rate * grad_weights_o
+            self.bias_o += self.learning_rate * grad_bias_o
+            self.weights_h += self.learning_rate * grad_weights_h
+            self.bias_h += self.learning_rate * grad_bias_h
+            
+        return self
+
+    def predict(self, X):
+        _, act_output = self._forward(X)
+        # Retorna 1 se a saída for > 0.5 (limiar), 0 caso contrário
+        return np.where(act_output > 0.5, 1, 0)
+
+# --- Exemplo de Uso (Problema XOR, não linearmente separável) ---
+X_xor = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+y_xor = np.array([[0], [1], [1], [0]]) # Saídas esperadas para XOR
+
+# Topologia: 2 entradas, 2 neurônios ocultos, 1 saída
+ffn = MLP_FFN(n_input=2, n_hidden=2, n_output=1, epochs=20000, learning_rate=0.1)
+ffn.fit(X_xor, y_xor)
+
+print("\n--- Teste da FFN (Porta Lógica XOR) ---")
+print(f"Custo final: {ffn.cost_[-1]:.4f}")
+print("Predições para o XOR:")
+print(ffn.predict(X_xor))
