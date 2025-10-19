@@ -1,4 +1,6 @@
 import numpy as np
+# Remova esta linha se não for plotar o gráfico
+import matplotlib.pyplot as plt 
 
 class MLP_FFN:
     """
@@ -6,24 +8,6 @@ class MLP_FFN:
     Utiliza a função Sigmoide como ativação e gradiente descendente em lote com momentum.
     """
     def __init__(self, n_input, n_hidden, n_output, learning_rate=0.1, epochs=10000, alpha=0.9, random_state=1):
-        """
-        Parâmetros
-        ----------
-        n_input : int
-          Número de neurônios na camada de entrada.
-        n_hidden : int
-          Número de neurônios na camada oculta.
-        n_output : int
-          Número de neurônios na camada de saída.
-        learning_rate : float
-          Taxa de aprendizado (eta).
-        epochs : int
-          Número de épocas de treinamento.
-        alpha : float
-          Coeficiente de momentum (entre 0.0 e 1.0).
-        random_state : int
-          Semente para inicialização de pesos.
-        """
         self.n_input = n_input
         self.n_hidden = n_hidden
         self.n_output = n_output
@@ -57,12 +41,12 @@ class MLP_FFN:
     def _forward(self, X):
         # Passagem da entrada para a camada oculta
         # Z_h = X * W_h + b_h  (Dimensões: [samples, input] * [input, hidden] + [hidden] = [samples, hidden])
-        net_hidden = np.dot(X, self.weights_h) + self.bias_h # REMOVIDO .T de weights_h
+        net_hidden = np.dot(X, self.weights_h) + self.bias_h
         act_hidden = self._sigmoid(net_hidden)
 
         # Passagem da camada oculta para a camada de saída
         # Z_o = A_h * W_o + b_o  (Dimensões: [samples, hidden] * [hidden, output] + [output] = [samples, output])
-        net_output = np.dot(act_hidden, self.weights_o) + self.bias_o # REMOVIDO .T de weights_o
+        net_output = np.dot(act_hidden, self.weights_o) + self.bias_o
         act_output = self._sigmoid(net_output)
 
         return act_hidden, act_output
@@ -70,11 +54,6 @@ class MLP_FFN:
     def fit(self, X, y):
         """
         Treina a rede usando backpropagation em lote com momentum.
-
-        Parâmetros
-        ----------
-        X : {array-like}, shape = [n_samples, n_features]
-        y : {array-like}, shape = [n_samples, n_output_features]
         """
         self.cost_ = []
         n_samples = X.shape[0]
@@ -85,13 +64,18 @@ class MLP_FFN:
             act_hidden, act_output = self._forward(X)
 
             # 2. Cálculo do Erro (Função de Custo - Erro Quadrático Médio por amostra)
-            # O erro é calculado sobre o lote, mas normalizado pelo número de amostras
             cost = np.sum((y - act_output)**2) / (2.0 * n_samples)
             self.cost_.append(cost)
 
             # --- Impressão opcional do custo para monitoramento ---
-            # if (epoch + 1) % 1000 == 0:
-            #     print(f"Época {epoch+1}/{self.epochs}, Custo: {cost:.6f}")
+            if (epoch + 1) % 500 == 0:
+                 print(f"Época {epoch+1}/{self.epochs}, Custo: {cost:.6f}")
+            
+            # --- Verificação de Convergência ---
+            # Se o custo for muito baixo, podemos parar
+            if cost < 0.001:
+                print(f"Convergência alcançada na época {epoch+1} com custo {cost:.6f}.")
+                break
 
 
             # 3. Retropropagação (Backward Pass) - Calculando gradientes para o lote
@@ -101,11 +85,10 @@ class MLP_FFN:
             delta_output = error_output * self._sigmoid_derivative(act_output)
 
             # Erro e delta da camada oculta (retropropagado)
-            error_hidden = np.dot(delta_output, self.weights_o.T) # Aqui usa-se .T para propagar o erro
+            error_hidden = np.dot(delta_output, self.weights_o.T) 
             delta_hidden = error_hidden * self._sigmoid_derivative(act_hidden)
 
             # Cálculo dos gradientes médios no lote
-            # Gradientes são a média das contribuições de cada amostra no lote
             grad_weights_o = np.dot(act_hidden.T, delta_output) / n_samples
             grad_bias_o = np.sum(delta_output, axis=0) / n_samples
 
@@ -114,19 +97,16 @@ class MLP_FFN:
 
             # 4. Atualização dos Pesos (Gradiente Descendente com Momentum)
 
-            # Calcula a atualização atual com momentum
             update_wo = (self.learning_rate * grad_weights_o) + (self.alpha * self.prev_update_wo)
             update_bo = (self.learning_rate * grad_bias_o) + (self.alpha * self.prev_update_bo)
             update_wh = (self.learning_rate * grad_weights_h) + (self.alpha * self.prev_update_wh)
             update_bh = (self.learning_rate * grad_bias_h) + (self.alpha * self.prev_update_bh)
 
-            # Aplica a atualização
             self.weights_o += update_wo
             self.bias_o += update_bo
             self.weights_h += update_wh
             self.bias_h += update_bh
 
-            # Guarda a atualização atual para a próxima iteração
             self.prev_update_wo = update_wo
             self.prev_update_bo = update_bo
             self.prev_update_wh = update_wh
@@ -136,7 +116,6 @@ class MLP_FFN:
         return self
 
     def predict(self, X):
-        # Garante que X seja pelo menos 2D para np.dot funcionar corretamente
         X_proc = np.atleast_2d(X)
         _, act_output = self._forward(X_proc)
         # Retorna 1 se a saída for > 0.5 (limiar), 0 caso contrário
@@ -146,9 +125,13 @@ class MLP_FFN:
 X_xor = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
 y_xor = np.array([[0], [1], [1], [0]]) # Saídas esperadas para XOR
 
-# Topologia: 2 entradas, 2 neurônios ocultos, 1 saída
-# Reduzi epochs pois momentum acelera, mas pode precisar de ajuste
-ffn = MLP_FFN(n_input=2, n_hidden=2, n_output=1, epochs=10000, learning_rate=0.1, alpha=0.9)
+# --- HIPERPARÂMETROS OTIMIZADOS ---
+# Topologia: 2 entradas, 4 neurônios ocultos (mais robusto), 1 saída
+# Aumentei o learning_rate e diminuí as épocas (ajuste)
+ffn = MLP_FFN(n_input=2, n_hidden=4, n_output=1, 
+              epochs=5000, 
+              learning_rate=0.5, 
+              alpha=0.9) # Momentum alto ajuda a "pular" mínimos locais
 ffn.fit(X_xor, y_xor)
 
 print("\n--- Teste da FFN (Porta Lógica XOR) ---")
@@ -157,13 +140,12 @@ print("Predições para o XOR:")
 predictions = ffn.predict(X_xor)
 print(predictions)
 
-# Opcional: Verificar acurácia
+# Verificar acurácia
 correct_predictions = np.sum(predictions == y_xor)
 accuracy = correct_predictions / y_xor.shape[0]
-print(f"Acurácia no XOR: {accuracy * 100:.2f}%")
+print(f"Acurácia no XOR: {accuracy * 100:.2f}%") # Deve ser 100%
 
-# Plotar a curva de custo (útil para visualizar o aprendizado)
-# import matplotlib.pyplot as plt
+# Plotar a curva de custo (descomente para usar)
 # plt.plot(range(1, len(ffn.cost_) + 1), ffn.cost_)
 # plt.xlabel('Épocas')
 # plt.ylabel('Custo (MSE)')
